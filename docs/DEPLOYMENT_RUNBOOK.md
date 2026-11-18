@@ -85,3 +85,21 @@ These are reproducible human-operated steps, not evidence of a completed deploym
 ## Known deployment verification gaps
 
 Azure credentials, real External ID discovery/PKCE flows, Cosmos queries/indexes/RBAC, registry pushes, container execution, Azure Repos policy enforcement, pipeline tasks/locks/approvals, deployment CLI behavior and live billing eligibility remain unverified. Terraform format/schema validation is local evidence only.
+
+
+## After all above next prompt:
+The DevKnowledge application has been implemented locally.
+
+I have now configured the required Azure and Azure DevOps accounts and permissions.
+
+Review the deployment documentation, Terraform configuration, and Azure Pipelines.
+
+Help me complete the deployment setup step by step, using the existing repository configuration.
+
+Do not assume that any Azure resource already exists. Verify prerequisites before proceeding.
+
+Do not execute terraform apply, create potentially billable resources, or deploy to production without my explicit approval.
+
+First, help me deploy and verify DEV. Once DEV is working correctly, help me configure and validate the manually approved PROD deployment.
+
+Ensure that the configured CI/CD behavior matches PRODUCT_SPEC.md.
