@@ -1,0 +1,73 @@
+# Run pipeline from main; revision is the feature commit/branch to validate and deploy.
+# Restore DEV: run with revision refs/heads/main.
+trigger: none
+pr: none
+parameters:
+  - name: revision
+    type: string
+    default: refs/heads/main
+variables:
+  - group: devknowledge-deployment
+pool:
+  vmImage: ubuntu-latest
+stages:
+  - stage: Validate
+    jobs:
+      - job: Package
+        steps:
+          - checkout: self
+            persistCredentials: true
+            fetchDepth: 0
+          - bash: |
+              set -euo pipefail
+              [[ "$REVISION" =~ ^[a-zA-Z0-9_./-]+$ ]] && [[ "$REVISION" != -* ]] || exit 1
+              git fetch origin "$REVISION"
+              git checkout --detach FETCH_HEAD
+              echo "Validating $(git rev-parse HEAD) from $REVISION"
+            env:
+              REVISION: ${{ parameters.revision }}
+            displayName: Select requested revision
+          - template: validation-steps.yml
+          - bash: |
+              set -euo pipefail
+              mkdir -p release/frontend
+              cp -r frontend/dist/devknowledge/browser/. release/frontend/
+              docker build -f backend/Dockerfile -t devknowledge:validated .
+              docker save devknowledge:validated -o release/api.tar
+              node scripts/package-release.mjs release
+            env:
+              RELEASE_SOURCE_REF: ${{ parameters.revision }}
+          - publish: release
+            artifact: validated
+  - stage: DeployDEV
+    condition: and(succeeded(), eq(variables['CloudDeploymentEnabled'], 'true'), eq(variables['CostSafetyApproved'], 'true'))
+    lockBehavior: sequential
+    jobs:
+      - deployment: Deploy
+        environment: devknowledge-dev
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - download: current
+                  artifact: validated
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: devknowledge-dev
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: bash scripts/deploy.sh "$(Pipeline.Workspace)/validated" dev
+                  env:
+                    REGISTRY_USER: $(RegistryUser)
+                    REGISTRY_TOKEN: $(RegistryToken)
+                    IMAGE_REPOSITORY: $(ImageRepository)
+                    RESOURCE_GROUP: $(ResourceGroup)
+                    CONTAINER_APP: $(DevContainerApp)
+                    API_ORIGIN: $(DevApiOrigin)
+                    WEB_ORIGIN: $(DevWebOrigin)
+                    OIDC_ISSUER: $(DevOidcIssuer)
+                    OIDC_CLIENT_ID: $(DevOidcClientId)
+                    OIDC_SCOPE: $(DevOidcScope)
+                    SWA_TOKEN: $(DevSwaToken)
+                    COST_SAFETY_APPROVED: $(CostSafetyApproved)

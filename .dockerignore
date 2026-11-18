@@ -1,0 +1,11 @@
+.git
+.local
+**/node_modules
+**/bin
+**/obj
+**/dist
+**/.angular
+**/data
+**/test-results
+**/playwright-report
+frontend/audit.json

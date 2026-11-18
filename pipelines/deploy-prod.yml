@@ -1,0 +1,52 @@
+# Create PROD environment approval checks BEFORE enabling this pipeline.
+# Only download artifacts from the trusted main release pipeline.
+trigger: none
+pr: none
+parameters:
+  - name: validatedRunId
+    type: number
+    default: 0
+variables:
+  - group: devknowledge-production
+pool:
+  vmImage: ubuntu-latest
+stages:
+  - stage: PromotePROD
+    lockBehavior: sequential
+    condition: and(eq(variables['CloudDeploymentEnabled'], 'true'), eq(variables['CostSafetyApproved'], 'true'))
+    jobs:
+      - deployment: Promote
+        environment: devknowledge-prod
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: DownloadPipelineArtifact@2
+                  inputs:
+                    buildType: specific
+                    project: $(System.TeamProjectId)
+                    definition: $(MainReleasePipelineId)
+                    buildVersionToDownload: specific
+                    pipelineId: ${{ parameters.validatedRunId }}
+                    targetPath: $(Pipeline.Workspace)/release
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: devknowledge-prod
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      cp "$(Pipeline.Workspace)/release/promotion/promotion.json" "$(Pipeline.Workspace)/release/validated/promotion.json"
+                      bash scripts/deploy.sh "$(Pipeline.Workspace)/release/validated" prod
+                  env:
+                    IMAGE_REPOSITORY: $(ImageRepository)
+                    RESOURCE_GROUP: $(ResourceGroup)
+                    CONTAINER_APP: $(ProdContainerApp)
+                    API_ORIGIN: $(ProdApiOrigin)
+                    WEB_ORIGIN: $(ProdWebOrigin)
+                    OIDC_ISSUER: $(ProdOidcIssuer)
+                    OIDC_CLIENT_ID: $(ProdOidcClientId)
+                    OIDC_SCOPE: $(ProdOidcScope)
+                    SWA_TOKEN: $(ProdSwaToken)
+                    COST_SAFETY_APPROVED: $(CostSafetyApproved)

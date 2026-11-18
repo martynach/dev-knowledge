@@ -1,0 +1,68 @@
+# Enable cloud deployment ONLY after cost review and explicit human approval.
+trigger:
+  batch: true
+  branches:
+    include: [main]
+pr: none
+variables:
+  - group: devknowledge-deployment
+pool:
+  vmImage: ubuntu-latest
+stages:
+  - stage: Validate
+    jobs:
+      - job: ValidateAndPackage
+        steps:
+          - checkout: self
+            persistCredentials: true
+          - template: validation-steps.yml
+          - bash: |
+              set -euo pipefail
+              mkdir -p release/frontend
+              cp -r frontend/dist/devknowledge/browser/. release/frontend/
+              docker build -f backend/Dockerfile -t devknowledge:validated .
+              docker save devknowledge:validated -o release/api.tar
+              node scripts/package-release.mjs release
+            displayName: Package validated revision without publishing containers
+          - publish: release
+            artifact: validated
+  - stage: DeployDEV
+    dependsOn: Validate
+    condition: and(succeeded(), eq(variables['CloudDeploymentEnabled'], 'true'), eq(variables['CostSafetyApproved'], 'true'))
+    lockBehavior: sequential
+    jobs:
+      - deployment: Deploy
+        environment: devknowledge-dev
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  persistCredentials: true
+                - download: current
+                  artifact: validated
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: devknowledge-dev
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+                      latest=$(git ls-remote origin refs/heads/main | cut -f1)
+                      test "$latest" = "$(Build.SourceVersion)" || { echo 'Stale main run; refusing DEV overwrite.'; exit 1; }
+                      bash scripts/deploy.sh "$(Pipeline.Workspace)/validated" dev
+                  env:
+                    REGISTRY_USER: $(RegistryUser)
+                    REGISTRY_TOKEN: $(RegistryToken)
+                    IMAGE_REPOSITORY: $(ImageRepository)
+                    RESOURCE_GROUP: $(ResourceGroup)
+                    CONTAINER_APP: $(DevContainerApp)
+                    API_ORIGIN: $(DevApiOrigin)
+                    WEB_ORIGIN: $(DevWebOrigin)
+                    OIDC_ISSUER: $(DevOidcIssuer)
+                    OIDC_CLIENT_ID: $(DevOidcClientId)
+                    OIDC_SCOPE: $(DevOidcScope)
+                    SWA_TOKEN: $(DevSwaToken)
+                    COST_SAFETY_APPROVED: $(CostSafetyApproved)
+                - publish: $(Pipeline.Workspace)/validated/promotion.json
+                  artifact: promotion

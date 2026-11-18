@@ -1,0 +1,9 @@
+# Azure Repos: attach this pipeline as required Build Validation on main.
+# Azure Repos PR validation is controlled by branch policy, not YAML pr triggers.
+trigger: none
+pr: none
+pool:
+  vmImage: ubuntu-latest
+steps:
+  - checkout: self
+  - template: validation-steps.yml

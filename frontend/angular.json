@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "projects": {
+    "devknowledge": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": "src",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "src/main.ts",
+            "tsConfig": "tsconfig.app.json",
+            "index": "src/index.html",
+            "styles": [
+              "src/styles.css",
+              "node_modules/highlight.js/styles/github-dark.css"
+            ],
+            "assets": [{ "glob": "**/*", "input": "public" }],
+            "outputPath": "dist/devknowledge",
+            "budgets": [
+              {
+                "type": "initial",
+                "maximumWarning": "1MB",
+                "maximumError": "1.5MB"
+              }
+            ]
+          }
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "options": { "buildTarget": "devknowledge:build" }
+        }
+      }
+    }
+  },
+  "cli": {
+    "analytics": false
+  }
+}
