@@ -1,0 +1,25 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports: ["127.0.0.1:5080:8080"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Auth__Development: "true"
+      Auth__AdminSubject: local|admin
+      Storage__Local: "true"
+      Storage__Path: /data/local.json
+      Storage__Seed: "true"
+      Frontend__Origin: http://localhost:4200
+    volumes: ["local-data:/data"]
+    # A fresh named volume must be writable by the unprivileged runtime user.
+    user: "1654:1654"
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports: ["127.0.0.1:4200:8080"]
+    depends_on: [api]
+volumes:
+  local-data:

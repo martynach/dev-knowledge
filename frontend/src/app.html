@@ -1,0 +1,328 @@
+<a class="skip" href="#main">Skip to content</a>
+<header>
+  <div class="nav">
+    <a class="brand" routerLink="/"
+      ><span class="logo">dk<span>_</span></span> DevKnowledge</a
+    >
+    <nav aria-label="Main navigation">
+      <a routerLink="/">Library</a
+      ><a routerLink="/join">Join the team</a>@if(api.canWrite()){<a
+        routerLink="/mine"
+        >My articles</a
+      ><a class="button small" routerLink="/write">+ Write an article</a
+      >}@if(api.me()?.role==='Admin'){<a routerLink="/admin">Applications</a>}
+    </nav>
+    @if(ready()){@if(api.config.developmentAuth){<label class="identity"
+      >Local identity<select
+        aria-label="Local identity"
+        [ngModel]="api.user()"
+        (ngModelChange)="identity($event)"
+      >
+        <option value="">Visitor</option>
+        <option value="reader">Reader</option>
+        <option value="editor">Editor</option>
+        <option value="other">Other editor</option>
+        <option value="admin">Admin</option>
+      </select></label
+    >}@else{@if(api.me()){<button class="quiet" (click)="api.logout()">
+      Sign out</button
+    >}@else{<button class="quiet" (click)="api.login()">Sign in</button>}}}
+  </div>
+</header>
+<main id="main">
+  @if(error()){
+  <div class="notice error" role="alert">{{error()}}</div>
+  } @if(success()){
+  <div class="notice success" role="status">{{success()}}</div>
+  } @if(!ready()){
+  <p role="status">Connecting to the knowledge library…</p>
+  }@else{ @if(view()==='home'){
+  <section class="hero">
+    <div>
+      <p class="eyebrow">THE DEVELOPER’S SHARED NOTEBOOK</p>
+      <h1>Good ideas deserve<br />a place to <em>grow.</em></h1>
+      <p class="lead">
+        Practical guides, hard-won lessons, and useful discoveries.<br />Written
+        by developers. Open to everyone.
+      </p>
+      <a class="text-link" routerLink="/join"
+        >Share what you know <span aria-hidden="true">↗</span></a
+      >
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <div class="art-label">KNOWLEDGE / IN PROGRESS</div>
+      <div class="code-line"><span>01</span> learn something.</div>
+      <div class="code-line"><span>02</span> write it down.</div>
+      <div class="code-line accent">
+        <span>03</span> pass it on<span class="cursor">_</span>
+      </div>
+      <div class="art-bottom">A little clarity goes a long way. <b>✳</b></div>
+    </div>
+  </section>
+  <section aria-labelledby="library-title">
+    <div class="section-heading">
+      <h2 id="library-title">The library <span>{{total()}}</span></h2>
+      <p>A new perspective is one article away.</p>
+    </div>
+    <form class="filters" (ngSubmit)="list(true)">
+      <label class="search"
+        >Search articles<input
+          name="search"
+          [(ngModel)]="search"
+          maxlength="200"
+          placeholder="Search titles and content…" /></label
+      ><label
+        >Tag<input
+          name="tag"
+          [(ngModel)]="tag"
+          maxlength="24"
+          placeholder="e.g. dotnet" /></label
+      ><button type="submit">Search</button>
+    </form>
+    <p class="hint">
+      Search covers the latest 200 articles. Case-insensitive text matching; no
+      ranked or full-text search.
+    </p>
+    @if(loading()){
+    <p role="status">Loading articles…</p>
+    }@else{@if(!articles().length){
+    <div class="empty">
+      <h3>No articles found</h3>
+      <p>Try a different search or be the first to share an idea.</p>
+    </div>
+    }
+    <div class="article-grid">
+      @for(a of articles();track a.id){
+      <article class="card">
+        <div class="tags">
+          @for(t of a.tags;track t){<button (click)="tag=t;list(true)">
+            {{t}}</button
+          >}
+        </div>
+        <h3><a [routerLink]="'/articles/'+a.id">{{a.title}}</a></h3>
+        <p class="card-description">
+          Explore the explanation, examples, and ideas behind this article.
+        </p>
+        <div class="card-footer">
+          <span class="avatar">{{a.authorName.charAt(0).toUpperCase()}}</span
+          ><span
+            >{{a.authorName}}<small
+              >{{a.publishedAt | date:'MMM d, yyyy'}}</small
+            ></span
+          ><a
+            [routerLink]="'/articles/'+a.id"
+            [attr.aria-label]="'Read '+a.title"
+            >↗</a
+          >
+        </div>
+      </article>
+      }
+    </div>
+    <div class="pagination">
+      <button class="quiet" [disabled]="page===1" (click)="page=page-1;list()">
+        Previous</button
+      ><span>Page {{page}} · {{total()}} articles</span
+      ><button
+        class="quiet"
+        [disabled]="page*10>=total()"
+        (click)="page=page+1;list()"
+      >
+        Next
+      </button>
+    </div>
+    }
+  </section>
+  } @if(view()==='detail' && article();as a){
+  <div class="reading">
+    <a class="text-link" routerLink="/">← Back to the library</a>
+    <div class="tags">@for(t of a.tags;track t){<span>{{t}}</span>}</div>
+    <h1>{{a.title}}</h1>
+    <p class="byline">
+      By {{a.authorName}} · {{a.publishedAt | date:'longDate'}}
+    </p>
+    <div class="actions">
+      @if(api.canEdit(a)){<a class="button" [routerLink]="'/edit/'+a.id"
+        >Edit article</a
+      ><button class="danger" (click)="remove(a)">Delete article</button
+      >}<button class="quiet" (click)="copyFirstCode()">
+        Copy first code block
+      </button>
+    </div>
+    <p class="hint">
+      Click any code block to copy it. Use the button above with a keyboard.
+    </p>
+    <div class="prose" [innerHTML]="html()" (click)="copyCode($event)"></div>
+    <a class="text-link" href="#main">Back to top ↑</a>
+  </div>
+  } @if(view()==='write' && api.canWrite() && !error().startsWith('Access
+  denied')){
+  <section class="form-page">
+    <p class="eyebrow">CONTRIBUTE TO THE LIBRARY</p>
+    <h1>{{editingId?'Refine your article':'Share something useful.'}}</h1>
+    <p>Your article will be public immediately after publishing.</p>
+    <form (ngSubmit)="save()">
+      <label
+        >Title<input
+          name="title"
+          [(ngModel)]="title"
+          maxlength="160"
+          required
+          placeholder="A clear title goes a long way" /></label
+      ><label
+        >Tags <small>Up to 5, separated by commas</small
+        ><input
+          name="tags"
+          [(ngModel)]="tags"
+          placeholder="dotnet, architecture"
+      /></label>
+      <div class="editor-heading">
+        <label for="markdown">Markdown</label
+        ><label class="import"
+          >Import .md<input
+            aria-label="Import Markdown file"
+            type="file"
+            accept=".md,text/markdown"
+            (change)="importFile($event)"
+        /></label>
+      </div>
+      <textarea
+        id="markdown"
+        name="markdown"
+        [(ngModel)]="markdown"
+        rows="18"
+        required
+        placeholder="# Start with an idea…"
+      ></textarea>
+      <p class="hint">
+        Plain Markdown · 100 KiB UTF-8 maximum · HTML and embedded media
+        disabled
+      </p>
+      <div class="actions">
+        <button type="submit" [disabled]="loading()">
+          {{loading()?'Publishing…':'Publish article'}}</button
+        ><button type="button" class="quiet" (click)="showPreview()">
+          {{preview()?'Hide preview':'Preview'}}</button
+        ><a routerLink="/">Cancel</a>
+      </div>
+      @if(preview()){
+      <div class="prose preview" [innerHTML]="html()"></div>
+      }
+    </form>
+  </section>
+  } @if(view()==='join'){
+  <section class="form-page">
+    <p class="eyebrow">BUILD A BETTER SHARED NOTEBOOK</p>
+    <h1>What have you learned?</h1>
+    <p>
+      Join the editorial team and turn your experience into someone else’s next
+      breakthrough.
+    </p>
+    <form (ngSubmit)="apply()">
+      <label
+        >Your name<input
+          name="name"
+          [(ngModel)]="name"
+          maxlength="100"
+          required
+          autocomplete="name" /></label
+      ><label
+        >Email address<input
+          name="email"
+          [(ngModel)]="email"
+          type="email"
+          maxlength="254"
+          required
+          autocomplete="email" /></label
+      ><label
+        >Why would you like to contribute?<textarea
+          name="motivation"
+          [(ngModel)]="motivation"
+          maxlength="2000"
+          rows="6"
+          required
+        ></textarea></label
+      ><label class="honeypot" aria-hidden="true"
+        >Website<input
+          name="website"
+          [(ngModel)]="website"
+          tabindex="-1"
+          autocomplete="off"
+      /></label>
+      <p class="hint">
+        Only administrators can see your application. Approval requires a
+        verified sign-in identity.
+      </p>
+      <button [disabled]="loading()">Send application</button>
+    </form>
+  </section>
+  } @if(view()==='mine'){
+  <section>
+    <h1>My articles</h1>
+    <p class="hint">Your published contributions to the library.</p>
+    <a class="button" routerLink="/write">Write an article</a>@for(a of
+    articles();track a.id){
+    <article class="row">
+      <a [routerLink]="'/articles/'+a.id">{{a.title}}</a
+      ><a [routerLink]="'/edit/'+a.id">Edit</a
+      ><button class="danger" (click)="remove(a)">Delete article</button>
+    </article>
+    }@empty{
+    <p>You haven’t published an article yet.</p>
+    }
+    <div class="pagination">
+      <button class="quiet" [disabled]="page===1" (click)="page=page-1;mine()">
+        Previous</button
+      ><span>Page {{page}} · {{total()}} articles</span
+      ><button
+        class="quiet"
+        [disabled]="page*10>=total()"
+        (click)="page=page+1;mine()"
+      >
+        Next
+      </button>
+    </div>
+  </section>
+  } @if(view()==='admin' && api.me()?.role==='Admin'){
+  <section>
+    <h1>Editorial applications</h1>
+    <p>
+      Review the application, then independently verify the applicant’s
+      identity-provider issuer and subject using the deployment runbook. Never
+      grant access using email alone.
+    </p>
+    <label
+      >Verified issuer|subject<input
+        [(ngModel)]="subject"
+        placeholder="https://tenant.../v2.0|verified-subject"
+    /></label>
+    <p class="hint">
+      Local test applicant: local|reader. This field grants Editor only. Admin
+      bootstrap is deployment configuration.
+    </p>
+    @for(a of applications();track a.id){
+    <article class="application">
+      <h2>{{a.name}} <small>{{a.status}}</small></h2>
+      <p>{{a.email}}</p>
+      <p>{{a.motivation}}</p>
+      @if(a.status==='Pending'){
+      <div class="actions">
+        <button (click)="moderate(a,'approve')" [disabled]="!subject">
+          Approve verified identity</button
+        ><button class="danger" (click)="moderate(a,'reject')">Reject</button>
+      </div>
+      }
+    </article>
+    }@empty{
+    <p>No applications to review.</p>
+    }
+  </section>
+  } }
+</main>
+<footer>
+  <a class="brand" routerLink="/">DevKnowledge<span class="dot">.</span></a
+  ><span>Less rediscovering. More understanding.</span
+  ><span
+    >@if(ready() && api.config.commit){ {{api.config.sourceRef}} ·
+    {{api.config.commit.slice(0,8)}} }@else{Built to be shared ↗}</span
+  >
+</footer>

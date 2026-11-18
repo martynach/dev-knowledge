@@ -1,0 +1,53 @@
+steps:
+  - task: UseDotNet@2
+    inputs:
+      packageType: sdk
+      version: 10.0.401
+  - task: UseNode@1
+    inputs:
+      version: 24.21.0
+  - bash: |
+      set -euo pipefail
+      dotnet restore backend/DevKnowledge.slnx --locked-mode
+      dotnet format backend/DevKnowledge.slnx --verify-no-changes --no-restore
+      dotnet build backend/DevKnowledge.slnx -c Release --no-restore
+      dotnet test backend/DevKnowledge.slnx -c Release --no-build --logger trx --results-directory TestResults
+      node --test scripts/release.test.mjs
+    displayName: Backend format, build and isolated HTTP tests
+  - bash: |
+      set -euo pipefail
+      npm ci
+      node ../scripts/check-config.mjs
+      npm run lint
+      npm run format:check
+      npm run typecheck
+      npm test
+      npm run build
+      npx playwright install --with-deps chromium
+      npm run e2e
+    workingDirectory: frontend
+    displayName: Angular checks and local Chromium user journeys
+    env:
+      CI: 'true'
+  - bash: |
+      set -euo pipefail
+      curl -fsSLO https://releases.hashicorp.com/terraform/1.14.0/terraform_1.14.0_linux_amd64.zip
+      curl -fsSLO https://releases.hashicorp.com/terraform/1.14.0/terraform_1.14.0_SHA256SUMS
+      grep ' terraform_1.14.0_linux_amd64.zip$' terraform_1.14.0_SHA256SUMS | sha256sum -c -
+      unzip -o terraform_1.14.0_linux_amd64.zip -d /tmp/dk-terraform
+      /tmp/dk-terraform/terraform -chdir=infrastructure/terraform fmt -check -recursive
+      /tmp/dk-terraform/terraform -chdir=infrastructure/terraform init -backend=false -lockfile=readonly
+      /tmp/dk-terraform/terraform -chdir=infrastructure/terraform validate
+      docker compose config --quiet
+      docker compose build
+    displayName: Offline IaC validation and Docker builds (no cloud calls)
+  - task: PublishTestResults@2
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: VSTest
+      testResultsFiles: TestResults/*.trx
+  - task: PublishPipelineArtifact@1
+    condition: failed()
+    inputs:
+      targetPath: frontend/test-results
+      artifact: browser-failures
